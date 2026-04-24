@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Semaglutide Plasma Concentration Plotter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0f1a;
+    --surface: #111827;
+    --surface2: #1a2333;
+    --border: #1f2d42;
+    --accent: #3b82f6;
+    --accent2: #60a5fa;
+    --accent-glow: rgba(59,130,246,0.15);
+    --text: #e2e8f0;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    --green: #10b981;
+    --red: #ef4444;
+    --warn: #f59e0b;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 14px; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(59,130,246,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(59,130,246,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .container {
+    position: relative; z-index: 1;
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+  header {
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 22px;
+  }
+  header .tag {
+    color: var(--accent); margin-bottom: 8px;
+  }
+  header h1 { font-size: 22px; font-weight: 500; letter-spacing: -0.3px; }
+  header p { margin-top: 6px; font-size: 12px; color: var(--text-muted); line-height: 1.6; }
+  .disclaimer {
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.2);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px; font-size: 11px; color: var(--warn);
+    margin-top: 12px; line-height: 1.5;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 310px 1fr;
+    gap: 20px; align-items: start;
+  }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    /* overflow: hidden; — removed: clips stat tooltips that overflow above the panel */
+  }
+  .panel-header {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel-body { padding: 16px; }
+
+  .form-group { margin-bottom: 12px; }
+  label {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 400; color: var(--text-dim);
+    margin-bottom: 5px; letter-spacing: 0.03em; cursor: default;
+  }
+  input[type="number"], input[type="date"], select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 11px; color: var(--text);
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    outline: none; transition: border-color 0.2s;
+    -webkit-appearance: none; appearance: none;
+  }
+  input[type="date"] { color-scheme: dark; }
+  input:focus, select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  input[type="number"] { -moz-appearance: textfield; }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .input-wrap { position: relative; }
+  .input-wrap input { padding-right: 46px; }
+  .input-unit {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    color: var(--text-muted); pointer-events: none;
+  }
+  select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    padding-right: 30px;
+  }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px 16px; border-radius: var(--radius-sm);
+    font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.05em; cursor: pointer; border: none; transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; width: 100%; }
+  .btn-primary:hover { background: var(--accent2); box-shadow: 0 0 16px var(--accent-glow); }
+  .btn-sm { padding: 5px 10px; font-size: 10px; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: var(--red); }
+  .btn-danger:hover { background: rgba(239,68,68,0.2); }
+
+  .add-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .add-grid .form-group { margin-bottom: 0; }
+  .section-label {
+    font-size: 9px; color: var(--text-muted); margin-bottom: 8px;
+  }
+
+  .dose-list {
+    display: flex; flex-direction: column; gap: 5px;
+    max-height: 240px; overflow-y: auto;
+    margin-bottom: 12px; padding-right: 2px;
+  }
+  .dose-list::-webkit-scrollbar { width: 4px; }
+  .dose-list::-webkit-scrollbar-track { background: transparent; }
+  .dose-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .dose-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 7px 10px;
+    transition: border-color 0.15s;
+  }
+  .dose-item:hover { border-color: var(--accent); }
+  .dose-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 5px var(--accent); flex-shrink: 0;
+  }
+  .dose-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .dose-date { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-dim); }
+  .dose-meta { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--accent2); }
+  .empty-state { text-align: center; padding: 20px; font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+
+  .chart-panel { display: flex; flex-direction: column; }
+  .chart-toolbar {
+    padding: 11px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .toolbar-left { display: flex; align-items: center; gap: 8px; }
+  .toolbar-right { display: flex; align-items: center; gap: 6px; }
+  .toggle-group {
+    display: flex; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden;
+  }
+  .toggle-btn {
+    padding: 5px 12px; font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.05em;
+    cursor: pointer; border: none; background: transparent;
+    color: var(--text-muted); transition: all 0.15s;
+  }
+  .toggle-btn.active { background: var(--accent); color: #fff; }
+  .range-select {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 5px 26px 5px 9px;
+    color: var(--text-dim); font-family: 'DM Mono', monospace; font-size: 10px;
+    cursor: pointer; outline: none; appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 7px center;
+  }
+  .chart-wrap { padding: 18px 14px 10px; flex: 1; }
+  canvas#pkChart { width: 100% !important; display: block; }
+  .no-data-msg {
+    display: flex; align-items: center; justify-content: center;
+    height: 300px; font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--text-muted); flex-direction: column; gap: 10px;
+  }
+  .no-data-msg svg { opacity: 0.25; }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; background: var(--border);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) var(--radius); overflow: visible;
+  }
+  .stat {
+    background: var(--surface); padding: 11px 12px; text-align: center;
+    position: relative;
+    /* allow tooltip to overflow */
+    overflow: visible;
+  }
+  .stat-label {
+    font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+    cursor: help; user-select: none;
+  }
+  .info-icon {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: var(--border); color: var(--text-muted);
+    font-size: 8px; display: inline-flex; align-items: center; justify-content: center;
+    font-family: Georgia, serif; font-style: italic; font-weight: bold;
+    flex-shrink: 0; transition: background 0.15s, color 0.15s;
+    line-height: 1;
+  }
+  .stat:hover .info-icon { background: var(--accent); color: #fff; }
+
+  .stat-tooltip {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%; transform: translateX(-50%);
+    background: #162032;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 13px;
+    font-size: 11px; color: var(--text-dim);
+    line-height: 1.55;
+    width: 230px; text-align: left;
+    z-index: 200;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.6);
+    pointer-events: none;
+  }
+  .stat-tooltip::after {
+    content: '';
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: #162032;
+  }
+  .stat-tooltip::before {
+    content: '';
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: var(--border);
+    margin-top: 1px;
+  }
+  .stat:hover .stat-tooltip { display: block; }
+  .stat-tooltip strong { color: var(--accent2); font-weight: 500; display: block; margin-bottom: 5px; font-size: 11px; }
+
+  .stat-val { font-family: 'DM Mono', monospace; font-size: 13px; font-weight: 500; color: var(--text); }
+  .stat-val.green { color: var(--green); }
+  .stat-val.amber { color: var(--warn); }
+  .stat-val.blue  { color: var(--accent2); }
+
+  .storage-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; flex-wrap: wrap;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 10px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+  }
+  .storage-bar.ok {
+    background: rgba(16,185,129,0.07);
+    border: 1px solid rgba(16,185,129,0.2);
+    color: var(--green);
+  }
+  .storage-bar.warn {
+    background: rgba(245,158,11,0.07);
+    border: 1px solid rgba(245,158,11,0.2);
+    color: var(--warn);
+  }
+  .storage-bar-left { display: flex; align-items: center; gap: 6px; }
+  .storage-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .storage-bar.ok  .storage-dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
+  .storage-bar.warn .storage-dot { background: var(--warn);  box-shadow: 0 0 5px var(--warn); }
+  .storage-bar-actions { display: flex; gap: 6px; }
+  .btn-icon {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 9px;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    cursor: pointer; border: 1px solid var(--border);
+    background: var(--surface2); color: var(--text-dim);
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-icon svg { flex-shrink: 0; }
+
+  .weight-hint {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    color: var(--text-muted); margin-top: 3px; margin-bottom: 12px;
+  }
+  .weight-hint span { color: var(--accent2); }
+
+  .pk-info {
+    margin-top: 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .pk-info-title {
+    font-size: 9px; color: var(--text-muted); margin-bottom: 10px;
+  }
+  .pk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 600px) { .pk-grid { grid-template-columns: 1fr 1fr; } }
+  .pk-key { font-size: 10px; color: var(--text-muted); margin-bottom: 2px; }
+  .pk-val { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent2); }
+
+  .donate-section {
+    margin-top: 16px;
+    padding: 32px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+  }
+  .donate-heart {
+    font-size: 28px;
+    line-height: 1;
+    color: #ef4444;
+    filter: drop-shadow(0 0 8px rgba(239,68,68,0.4));
+    animation: heartbeat 2s ease-in-out infinite;
+  }
+  @keyframes heartbeat {
+    0%, 100% { transform: scale(1); }
+    15%       { transform: scale(1.18); }
+    30%       { transform: scale(1); }
+    45%       { transform: scale(1.1); }
+    60%       { transform: scale(1); }
+  }
+  .donate-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.2px;
+  }
+  .donate-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    max-width: 420px;
+    line-height: 1.6;
+  }
+  .donate-buttons {
+    margin-top: 6px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+  }
+  .donate-thanks {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 4px;
+  }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 760px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    animation: modalIn 0.2s ease-out;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .modal-title {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .modal-close {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 18px; line-height: 1;
+    padding: 2px 6px; border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .modal-close:hover { color: var(--text); background: var(--surface2); }
+  .modal-body {
+    padding: 24px 28px;
+    overflow-y: auto;
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-dim);
+  }
+  .modal-body::-webkit-scrollbar { width: 5px; }
+  .modal-body::-webkit-scrollbar-track { background: transparent; }
+  .modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  .modal-body h1 { font-size: 18px; font-weight: 500; color: var(--text); margin: 0 0 16px; letter-spacing: -0.3px; }
+  .modal-body h2 { font-size: 14px; font-weight: 500; color: var(--text); margin: 28px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .modal-body h3 { font-size: 12px; font-weight: 500; color: var(--accent2); margin: 18px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .modal-body p { margin: 0 0 12px; }
+  .modal-body a { color: var(--accent2); text-decoration: none; }
+  .modal-body a:hover { text-decoration: underline; }
+  .modal-body img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 14px auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+  }
+  .modal-body code {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 3px; padding: 1px 5px; color: var(--accent2);
+  }
+  .modal-body pre {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 16px;
+    overflow-x: auto; margin: 0 0 14px;
+  }
+  .modal-body pre code {
+    background: none; border: none; padding: 0;
+    font-size: 11px; color: var(--text-dim);
+  }
+  .modal-body table {
+    width: 100%; border-collapse: collapse; margin: 0 0 14px; font-size: 12px;
+  }
+  .modal-body th {
+    font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--text-muted);
+    border-bottom: 1px solid var(--border); padding: 6px 10px; text-align: left;
+  }
+  .modal-body td { padding: 7px 10px; border-bottom: 1px solid rgba(31,45,66,0.5); }
+  .modal-body tr:last-child td { border-bottom: none; }
+  .modal-body ul, .modal-body ol { padding-left: 20px; margin: 0 0 12px; }
+  .modal-body li { margin-bottom: 4px; }
+  .modal-body hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+  .modal-body blockquote {
+    border-left: 3px solid var(--accent); margin: 0 0 14px;
+    padding: 4px 0 4px 14px; color: var(--text-muted); font-style: italic;
+  }
+  .modal-plain {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    line-height: 1.8; color: var(--text-dim); white-space: pre-wrap;
+  }
+  .modal-error {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--warn); padding: 20px 0;
+  }
+  .header-links {
+    display: flex; gap: 12px; margin-top: 10px;
+  }
+  .header-link {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--text-muted); cursor: pointer;
+    background: none; border: none; padding: 0;
+    display: flex; align-items: center; gap: 5px;
+    transition: color 0.15s;
+  }
+  .header-link:hover { color: var(--accent2); }
+  .header-link svg { opacity: 0.6; }
+  .header-link:hover svg { opacity: 1; }
+
+  header .tag,
+  .panel-header,
+  .section-label,
+  .pk-info-title,
+  .modal-title,
+  .header-link {
+    font-family: 'DM Mono', monospace;
+    text-transform: uppercase;
+  }
+
+  .panel-header,
+  .section-label,
+  .pk-info-title {
+    letter-spacing: 0.12em;
+  }
+
+  header .tag,
+  .panel-header {
+    font-size: 10px;
+  }
+
+  .panel-header::before,
+  .modal-title::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    flex-shrink: 0;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="tag">Clinical Pharmacokinetics · Semaglutide (Ozempic / Wegovy)</div>
+    <h1>Plasma Concentration Estimator</h1>
+    <p>One-compartment PK model with first-order absorption &amp; elimination. Parameters from FDA NDA 209637 Clinical Pharmacology Review and semaglutide labeling. Body weight is recorded per injection for longitudinal PK scaling.</p>
+    <div class="disclaimer">⚠ <strong>For educational/informational use only.</strong> This tool does not constitute medical advice. Individual PK varies and this model is a simplification. Never adjust your dosing based on this model without consulting your prescribing physician.</div>
+    <div class="header-links">
+      <button class="header-link" onclick="openModal('readme')">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        README
+      </button>
+      <button class="header-link" onclick="openModal('license')">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        LICENSE
+      </button>
+    </div>
+  </header>
+
+  <div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">README</div>
+        <button class="modal-close" onclick="closeModal()" title="Close">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <div class="modal-error">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <!-- LEFT PANEL -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">Add Injection</div>
+        <div class="panel-body">
+          <div class="section-label">Date &amp; Dose</div>
+          <div class="add-grid">
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" id="doseDate"/>
+            </div>
+            <div class="form-group">
+              <label>Dose (mg)</label>
+              <div class="input-wrap">
+                <input type="number" id="doseAmount" value="0.25" min="0.25" max="2.4" step="0.25"/>
+                <span class="input-unit">mg</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-label" style="margin-top:4px;">Body Weight at Time of Injection</div>
+          <div class="add-grid">
+            <div class="form-group">
+              <label>Pounds</label>
+              <div class="input-wrap">
+                <input type="number" id="weightLbs" value="198" min="66" max="440" step="1"/>
+                <span class="input-unit">lbs</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Kilograms</label>
+              <div class="input-wrap">
+                <input type="number" id="weightKg" value="89.8" min="30" max="200" step="0.1"/>
+                <span class="input-unit">kg</span>
+              </div>
+            </div>
+          </div>
+          <div class="weight-hint" style="margin-bottom:10px;">PK scalar: <span id="weightScalar">1.01×</span> vs. 90 kg reference</div>
+
+          <div style="display:flex; gap:8px; align-items:flex-end; margin-bottom:0;">
+            <button class="btn btn-primary" style="flex:1;" onclick="addDose()">+ Add Injection</button>
+            <div style="flex-shrink:0; width:80px;">
+              <label style="font-size:10px; color:var(--text-muted); margin-bottom:5px; display:block; white-space:nowrap;">Jump (days)</label>
+              <div class="input-wrap">
+                <input type="number" id="dayIncrement" value="7" min="1" max="365" step="1" style="text-align:center;"/>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-header">Injection Schedule</div>
+        <div class="panel-body">
+
+          <!-- Storage status + export/import -->
+          <div class="storage-bar ok" id="storageBar">
+            <div class="storage-bar-left">
+              <div class="storage-dot"></div>
+              <span id="storageMsg">Auto-saving to browser storage</span>
+            </div>
+            <div class="storage-bar-actions">
+              <button class="btn-icon" onclick="exportJSON()" title="Download data as JSON backup">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Export
+              </button>
+              <button class="btn-icon" onclick="triggerImport()" title="Load data from JSON backup">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Import
+              </button>
+              <input type="file" id="importInput" accept=".json" style="display:none;" onchange="importJSON(event)"/>
+            </div>
+          </div>
+
+          <div class="dose-list" id="doseList">
+            <div class="empty-state">No injections logged yet.</div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" onclick="fillExample()">Load example</button>
+            <button class="btn btn-ghost btn-sm" onclick="clearDoses()">Clear all</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="panel chart-panel">
+      <div class="chart-toolbar">
+        <div class="toolbar-left">
+          <div class="toggle-group">
+            <button class="toggle-btn active" id="btn-ngml" onclick="setUnit('ngml')">ng/mL</button>
+            <button class="toggle-btn" id="btn-mg" onclick="setUnit('mg')">mg equiv.</button>
+            <button class="toggle-btn" id="btn-wt" onclick="setUnit('wt')">Weight</button>
+          </div>
+        </div>
+        <div class="toolbar-right">
+          <label style="margin:0; font-size:10px; color:var(--text-muted); white-space:nowrap; cursor:default;">Range:</label>
+          <select class="range-select" id="rangeSelect" onchange="updateChart()">
+            <option value="30">30 days</option>
+            <option value="60" selected>60 days</option>
+            <option value="90">90 days</option>
+            <option value="180">180 days</option>
+            <option value="365">1 year</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div id="noDataMsg" class="no-data-msg">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 12h4l3-9 4 18 3-9h4"/></svg>
+          Add at least one injection to generate the curve.
+        </div>
+        <canvas id="pkChart" style="display:none;"></canvas>
+        <canvas id="wtChart" style="display:none;"></canvas>
+      </div>
+
+      <!-- STATS with hover tooltips -->
+      <div class="stats-row">
+
+        <div class="stat">
+          <div class="stat-label">Current Est. <span class="info-icon">i</span></div>
+          <div class="stat-tooltip">
+            <strong>Current Estimated Concentration</strong>
+            The model's estimate of semaglutide plasma concentration at this moment, computed by summing contributions from all logged injections at today's date and time. Each dose uses its own recorded body weight for scaling.
+          </div>
+          <div class="stat-val blue" id="statCurrent">—</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-label">Peak (C<sub style="font-size:7px;vertical-align:sub;">max</sub>) <span class="info-icon">i</span></div>
+          <div class="stat-tooltip">
+            <strong>Peak Concentration (Cmax)</strong>
+            The highest plasma concentration in the displayed window. Subcutaneous semaglutide typically peaks 1–3 days post-injection (tmax). This model uses a rate constant that places tmax around 48 hours within that range. With repeated weekly dosing, concentrations accumulate toward steady state over roughly 4–5 weeks.
+          </div>
+          <div class="stat-val green" id="statPeak">—</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-label">Trough (C<sub style="font-size:7px;vertical-align:sub;">min</sub>) <span class="info-icon">i</span></div>
+          <div class="stat-tooltip">
+            <strong>Trough Concentration (Cmin)</strong>
+            The lowest concentration between doses, measured after the first full dose cycle (post-tmax of dose 1). A non-zero trough reflects semaglutide's long roughly 1-week half-life — drug from prior injections is still present before the next dose is given.
+          </div>
+          <div class="stat-val amber" id="statTrough">—</div>
+        </div>
+
+        <div class="stat">
+          <div class="stat-label">SS Reached <span class="info-icon">i</span></div>
+          <div class="stat-tooltip">
+            <strong>Steady State (SS)</strong>
+            Steady state is when drug absorbed per dose equals drug eliminated per dosing interval — so concentrations stabilize into a consistent repeating pattern. Detected here when consecutive pre-dose trough values change by less than 5% between cycles. FDA labeling describes semaglutide steady state after approximately 4–5 weeks of once-weekly dosing.
+          </div>
+          <div class="stat-val" id="statSS">—</div>
+        </div>
+
+      </div><!-- /stats-row -->
+    </div><!-- /chart-panel -->
+  </div><!-- /layout -->
+
+  <div class="pk-info">
+    <div class="pk-info-title">PK Parameters — Source: FDA NDA 209637 and Semaglutide Labeling · One-compartment model</div>
+    <div class="pk-grid">
+      <div><div class="pk-key">Elimination half-life (t½)</div><div class="pk-val">~1 week (168 h)</div></div>
+      <div><div class="pk-key">Absorption tmax range (SC)</div><div class="pk-val">1–3 days</div></div>
+      <div><div class="pk-key">Bioavailability (F)</div><div class="pk-val">~89%</div></div>
+      <div><div class="pk-key">Clearance (CL/F)</div><div class="pk-val">~0.05 L/h</div></div>
+      <div><div class="pk-key">Volume of distribution (Vd)</div><div class="pk-val">~12.5 L</div></div>
+      <div><div class="pk-key">Plasma protein binding</div><div class="pk-val">&gt;99% (albumin)</div></div>
+      <div><div class="pk-key">Accumulation / washout</div><div class="pk-val">~5 weeks</div></div>
+      <div><div class="pk-key">Steady state (once-weekly)</div><div class="pk-val">~4–5 weeks</div></div>
+      <div><div class="pk-key">Dose proportionality</div><div class="pk-val">Injectable range</div></div>
+    </div>
+  </div>
+
+  <!-- DONATION SECTION -->
+  <div class="donate-section">
+    <div class="donate-heart">♥</div>
+    <div class="donate-title">Support This Project</div>
+    <div class="donate-label">If you find this tool useful, please consider making a small donation. It helps keep the project going and free for everyone.</div>
+    <div class="donate-buttons">
+      <div id="donate-button"></div>
+    </div>
+
+    <script src="https://www.paypalobjects.com/donate/sdk/donate-sdk.js" charset="UTF-8"></script>
+    <script>
+      (function initPayPal() {
+        if (typeof PayPal === 'undefined') {
+          setTimeout(initPayPal, 100);
+          return;
+        }
+        PayPal.Donation.Button({
+          env:'production',
+          hosted_button_id:'CN5YDW2KWLS2Y',
+          image: {
+            src:'https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif',
+            alt:'Donate with PayPal button',
+            title:'PayPal - The safer, easier way to pay online!',
+          }
+        }).render('#donate-button');
+      })();
+    </script>
+    <div class="donate-thanks">Thank you for your support 🙏</div>
+  </div>
+
+</div>
+<!-- container -->
+
+<script>
+// ─── PK CONSTANTS — FDA NDA 209637 / SEMAGLUTIDE LABELING ───────────────────
+const F = 0.89;        // approximate subcutaneous bioavailability
+const CL = 0.05;       // apparent clearance after SC administration (L/h)
+const Vd = 12.5;       // apparent volume of distribution after SC administration (L)
+const ka = 0.0606;     // absorption rate constant (h^-1), chosen for tmax near 48h within the 1-3 day range
+
+// Simple body weight scaling. Lower body weight increases exposure; higher body
+// weight decreases exposure, consistent with semaglutide labeling.
+const WEIGHT_EXP = -1.0;
+const WEIGHT_REF = 90; // kg
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+// Dose shape: { date: Date, amount: number (mg), weightKg: number }
+let doses = [];
+let currentUnit = 'ngml'; // 'ngml', 'mg', or 'wt'
+let chartInstance = null;
+let chartJsReady = false;
+let pendingRender = null;
+
+// ─── STORAGE ──────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'semaglutide_pk_doses_v1';
+let storageAvailable = false;
+
+function doseToJSON(dose) {
+  return {
+    dateISO: dose.date.toISOString(),
+    amount: dose.amount,
+    weightKg: dose.weightKg
+  };
+}
+
+function parseDoseRecord(record, index = 0) {
+  const row = index + 1;
+
+  if (!record.dateISO || record.amount == null || record.weightKg == null) {
+    throw new Error(`Record ${row} is missing dateISO, amount, or weightKg`);
+  }
+
+  const date = new Date(record.dateISO);
+  const amount = parseFloat(record.amount);
+  const weightKg = parseFloat(record.weightKg);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Record ${row} has an invalid date`);
+  }
+  if (!Number.isFinite(amount) || amount < 0.25 || amount > 2.4) {
+    throw new Error(`Record ${row} dose must be between 0.25 and 2.4 mg`);
+  }
+  if (!Number.isFinite(weightKg) || weightKg < 30 || weightKg > 300) {
+    throw new Error(`Record ${row} weight must be between 30 and 300 kg`);
+  }
+
+  return { date, amount, weightKg };
+}
+
+function parseDosePayload(payload) {
+  if (!Array.isArray(payload)) {
+    throw new Error('Expected an array of dose records');
+  }
+  return payload.map(parseDoseRecord).sort((a, b) => a.date - b.date);
+}
+
+function detectStorage() {
+  // localStorage can fail under file://, private browsing, or strict browser settings.
+  try {
+    const test = '__storage_test__';
+    localStorage.setItem(test, '1');
+    localStorage.removeItem(test);
+    storageAvailable = true;
+  } catch(e) {
+    storageAvailable = false;
+  }
+}
+
+function persistDoses() {
+  if (!storageAvailable) return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(doses.map(doseToJSON)));
+  } catch(e) {
+    console.warn('semaglutide-pk: failed to save to localStorage', e);
+  }
+}
+
+function loadPersistedDoses() {
+  if (!storageAvailable) return;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    doses = parseDosePayload(JSON.parse(raw));
+    if (doses.length === 0) return;
+    renderDoseList();
+    updateChart();
+  } catch(e) {
+    console.warn('semaglutide-pk: failed to load from localStorage', e);
+  }
+}
+
+function updateStorageUI() {
+  const bar = document.getElementById('storageBar');
+  const msg = document.getElementById('storageMsg');
+  if (storageAvailable) {
+    bar.className = 'storage-bar ok';
+    msg.textContent = 'Auto-saving to browser storage';
+  } else {
+    bar.className = 'storage-bar warn';
+    msg.textContent = 'Browser storage unavailable — use Export to save';
+  }
+}
+
+// ─── EXPORT / IMPORT ─────────────────────────────────────────────────────────
+function exportJSON() {
+  if (doses.length === 0) { alert('No data to export.'); return; }
+  const blob = new Blob([JSON.stringify(doses.map(doseToJSON), null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const dateStr = new Date().toISOString().split('T')[0];
+  a.href     = url;
+  a.download = `semaglutide-doses-${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function triggerImport() {
+  document.getElementById('importInput').value = ''; // reset so same file can be re-imported
+  document.getElementById('importInput').click();
+}
+
+function importJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const payload = JSON.parse(e.target.result);
+      const imported = parseDosePayload(payload);
+
+      if (doses.length > 0) {
+        if (!confirm(`Replace your ${doses.length} existing injection(s) with ${imported.length} imported record(s)?`)) return;
+      }
+      doses = imported;
+      persistDoses();
+      renderDoseList();
+      updateChart();
+    } catch(err) {
+      alert('Import failed: ' + err.message + '\n\nMake sure this is a valid semaglutide export file.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+
+(function loadChartJs() {
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+  s.onload = () => {
+    chartJsReady = true;
+    if (pendingRender) { pendingRender(); pendingRender = null; }
+  };
+  document.head.appendChild(s);
+})();
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  detectStorage();
+  updateStorageUI();
+
+  document.getElementById('doseDate').value = formatDateInputValue(new Date());
+  updateWeightHint();
+
+  document.getElementById('weightLbs').addEventListener('input', function() {
+    const v = parseFloat(this.value);
+    if (!isNaN(v)) document.getElementById('weightKg').value = (v / 2.20462).toFixed(1);
+    updateWeightHint();
+  });
+  document.getElementById('weightKg').addEventListener('input', function() {
+    const v = parseFloat(this.value);
+    if (!isNaN(v)) document.getElementById('weightLbs').value = Math.round(v * 2.20462);
+    updateWeightHint();
+  });
+
+  // Load persisted data after Chart.js is ready
+  loadPersistedDoses();
+});
+
+function formatDateInputValue(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getFormWeightKg() {
+  return Math.max(30, parseFloat(document.getElementById('weightKg').value) || 90);
+}
+
+function calcWeightScalar(kg) {
+  return Math.pow(Math.max(kg, 20) / WEIGHT_REF, WEIGHT_EXP);
+}
+
+function updateWeightHint() {
+  const kg = getFormWeightKg();
+  const s  = calcWeightScalar(kg);
+  const el = document.getElementById('weightScalar');
+  el.textContent = s.toFixed(2) + '×';
+  el.style.color = s > 1.05 ? 'var(--green)' : s < 0.95 ? 'var(--warn)' : 'var(--accent2)';
+}
+
+// ─── DOSE MANAGEMENT ─────────────────────────────────────────────────────────
+function addDose() {
+  const dateStr = document.getElementById('doseDate').value;
+  const amount  = parseFloat(document.getElementById('doseAmount').value);
+  const wKg     = getFormWeightKg();
+
+  if (!dateStr)                              { alert('Please select a date.');                        return; }
+  if (isNaN(amount) || amount < 0.25 || amount > 2.4) { alert('Dose must be 0.25–2.4 mg.');          return; }
+  if (isNaN(wKg)   || wKg < 30  || wKg > 300)       { alert('Enter a valid body weight (30–300 kg).');return; }
+
+  const date = new Date(dateStr + 'T12:00:00');
+  doses.push({ date, amount, weightKg: wKg });
+  doses.sort((a, b) => a.date - b.date);
+  persistDoses();
+  renderDoseList();
+  updateChart();
+
+  // Advance date by configured increment
+  const increment = Math.max(1, parseInt(document.getElementById('dayIncrement').value) || 7);
+  const next = new Date(date);
+  next.setDate(next.getDate() + increment);
+  document.getElementById('doseDate').value = formatDateInputValue(next);
+}
+
+function removeDose(idx) {
+  doses.splice(idx, 1);
+  persistDoses();
+  renderDoseList();
+  updateChart();
+}
+
+function clearDoses() {
+  if (doses.length > 0 && !confirm('Clear all injections? This cannot be undone.')) return;
+  doses = [];
+  persistDoses();
+  if (chartInstance)   { chartInstance.destroy();   chartInstance   = null; }
+  if (wtChartInstance) { wtChartInstance.destroy();  wtChartInstance = null; }
+  renderDoseList();
+  updateChart();
+}
+
+function buildExampleDoses(startDate) {
+  const exampleDoses = [];
+  const start = new Date(startDate);
+  start.setHours(12, 0, 0, 0);
+
+  const startWeightLbs = 230;
+  for (let i = 0; i < 9; i++) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + i * 7);
+
+    exampleDoses.push({
+      date,
+      amount: i < 4 ? 0.25 : 0.5,
+      weightKg: (startWeightLbs - i * 1.2) / 2.20462
+    });
+  }
+
+  return exampleDoses;
+}
+
+function fillExample() {
+  // Titration example: 0.25mg for 4 weeks, then 0.5mg for 5 weeks.
+  const start = new Date();
+  start.setDate(start.getDate() - 56);
+  doses = buildExampleDoses(start);
+  persistDoses();
+  renderDoseList();
+  updateChart();
+}
+
+function renderDoseList() {
+  const el = document.getElementById('doseList');
+  if (doses.length === 0) {
+    el.innerHTML = '<div class="empty-state">No injections logged yet.</div>';
+    return;
+  }
+  el.innerHTML = doses.map((d, i) => {
+    const lbs = (d.weightKg * 2.20462).toFixed(0);
+    return `<div class="dose-item">
+      <div class="dose-dot"></div>
+      <div class="dose-info">
+        <div class="dose-date">${fmtDate(d.date)}</div>
+        <div class="dose-meta">${d.amount} mg &nbsp;·&nbsp; ${lbs} lbs (${d.weightKg.toFixed(1)} kg)</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="removeDose(${i})">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function fmtDate(d) {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ─── PK MATH ─────────────────────────────────────────────────────────────────
+// Bateman equation — one-compartment, first-order absorption & elimination
+// C(t) = (F·D / Vd) · (ka / (ka − ke_eff)) · (e^(−ke_eff·t) − e^(−ka·t))
+// Units: D in mg, Vd in L → result in mg/L = µg/mL; multiply by 1000 → ng/mL
+// Reference check: a single 0.25mg SC dose peaks near 15 ng/mL with this model.
+// Weight modifies CL → ke_eff = CL_eff / Vd; ka and Vd are weight-independent (FDA data)
+function doseContrib(amount_mg, weightKg, t_hours) {
+  if (t_hours <= 0) return 0;
+  const scalar  = calcWeightScalar(weightKg);
+  const CL_eff  = CL / scalar;           // lower weight means lower CL and higher AUC
+  const ke_eff  = CL_eff / Vd;
+  const denom   = ka - ke_eff;
+  let c;
+  if (Math.abs(denom) < 1e-8) {
+    // ka ≈ ke: L'Hôpital limit form
+    c = (F * amount_mg / Vd) * ka * t_hours * Math.exp(-ke_eff * t_hours);
+  } else {
+    c = (F * amount_mg / Vd) * (ka / denom) * (Math.exp(-ke_eff * t_hours) - Math.exp(-ka * t_hours));
+  }
+  return Math.max(0, c) * 1000; // µg/mL → ng/mL
+}
+
+function computeConcForDoses(t_unix_ms, doseList) {
+  return doseList.reduce((sum, d) => {
+    const dt_h = (t_unix_ms - d.date.getTime()) / 3600000;
+    return sum + doseContrib(d.amount, d.weightKg, dt_h);
+  }, 0);
+}
+
+// Superposition of every logged injection up to time t.
+function computeConc(t_unix_ms) {
+  return computeConcForDoses(t_unix_ms, doses);
+}
+
+// ─── STEADY STATE DETECTION ──────────────────────────────────────────────────
+// Compute pre-dose trough for each dose ≥ 2nd. SS = when consecutive troughs
+// differ by < 5% for at least one pair.
+function detectSteadyStateForDoses(doseList) {
+  if (doseList.length < 3) return { reached: false };
+
+  const troughs = [];
+  for (let i = 1; i < doseList.length; i++) {
+    const t_ms = doseList[i].date.getTime() - 60000;
+    troughs.push(computeConcForDoses(t_ms, doseList));
+  }
+
+  for (let i = 1; i < troughs.length; i++) {
+    const prev = troughs[i - 1];
+    const curr = troughs[i];
+    if (prev < 0.001) continue; // skip near-zero (pre-accumulation)
+    const relChange = Math.abs(curr - prev) / prev;
+    if (relChange < 0.05) {
+      return { reached: true, atDoseNumber: i + 2 }; // 1-based, +2 because troughs start at dose 2
+    }
+  }
+  return { reached: false };
+}
+
+function detectSteadyState() {
+  return detectSteadyStateForDoses(doses);
+}
+
+// ─── UNIT HELPERS ────────────────────────────────────────────────────────────
+// Two display units:
+//   ng/mL  — raw model output
+//   mg equiv. — apparent amount in central compartment: C(ng/mL) × Vd(L) = µg → ÷1000 = mg
+//   Cross-check: 0.25mg dose × 89% F = ~0.22mg absorbed.
+function toDisplay(ngml) {
+  return currentUnit === 'mg' ? (ngml * Vd) / 1000 : ngml;
+}
+
+function fmtStat(ngml) {
+  if (currentUnit === 'mg') {
+    const mg = (ngml * Vd) / 1000;
+    return mg.toFixed(4) + ' mg';
+  }
+  return ngml.toFixed(2) + ' ng/mL';
+}
+
+function setUnit(u) {
+  currentUnit = u;
+  document.getElementById('btn-ngml').classList.toggle('active', u === 'ngml');
+  document.getElementById('btn-mg').classList.toggle('active',   u === 'mg');
+  document.getElementById('btn-wt').classList.toggle('active',   u === 'wt');
+  updateChart();
+}
+
+// ─── AUTO RANGE ───────────────────────────────────────────────────────────────
+// Range tiers in days — must match the <option> values in rangeSelect
+const RANGE_TIERS = [30, 60, 90, 180, 365];
+
+function autoRange() {
+  if (doses.length < 2) return;
+  const firstDoseMs = doses[0].date.getTime();
+  const lastDoseMs  = doses[doses.length - 1].date.getTime();
+  // Add 14 days of forward padding so the last dose has a visible tail
+  const spanDays = (lastDoseMs - firstDoseMs) / 86400000 + 14;
+
+  const select      = document.getElementById('rangeSelect');
+  const currentVal  = parseInt(select.value);
+
+  // Find the smallest tier that fits the data span
+  const needed = RANGE_TIERS.find(t => t >= spanDays) || RANGE_TIERS[RANGE_TIERS.length - 1];
+
+  // Only expand — never shrink the user's selection
+  if (needed > currentVal) {
+    select.value = needed;
+  }
+}
+
+// ─── MAIN UPDATE ─────────────────────────────────────────────────────────────
+function updateChart() {
+  const noMsg    = document.getElementById('noDataMsg');
+  const pkCanvas = document.getElementById('pkChart');
+  const wtCanvas = document.getElementById('wtChart');
+
+  if (doses.length === 0) {
+    noMsg.style.display    = 'flex';
+    pkCanvas.style.display = 'none';
+    wtCanvas.style.display = 'none';
+    updateStats(null);
+    return;
+  }
+  noMsg.style.display = 'none';
+  autoRange();
+  if (currentUnit === 'wt') {
+    pkCanvas.style.display = 'none';
+    wtCanvas.style.display = 'block';
+    updateStats(null); // stats row not meaningful for weight view
+    renderWeightChart();
+    return;
+  }
+
+  pkCanvas.style.display = 'block';
+  wtCanvas.style.display = 'none';
+  if (wtChartInstance) { wtChartInstance.destroy(); wtChartInstance = null; }
+
+  const rangeDays    = parseInt(document.getElementById('rangeSelect').value);
+  const firstDoseMs  = doses[0].date.getTime();
+  const now          = Date.now();
+
+  // Window: start just before first dose, extend rangeDays forward
+  const windowStart = firstDoseMs - 12 * 3600000;
+  const windowEnd   = windowStart + rangeDays * 86400000;
+
+  // Step: 1h for ≤90 days, 2h for ≤180, 4h for 1 year
+  const stepH  = rangeDays <= 90 ? 1 : rangeDays <= 180 ? 2 : 4;
+  const stepMs = stepH * 3600000;
+
+  const times = [];
+  const concs = [];
+  for (let t = windowStart; t <= windowEnd; t += stepMs) {
+    times.push(t);
+    concs.push(computeConc(t));
+  }
+
+  const displayConcs = concs.map(c => toDisplay(c));
+  const labels       = times.map(t =>
+    new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  );
+
+  // ── Stats ──
+  const maxC = Math.max(...concs);
+
+  // Trough: minimum concentration strictly between consecutive dose windows.
+  let minC = Infinity;
+  if (doses.length >= 2) {
+    for (let di = 0; di < doses.length - 1; di++) {
+      const winStart = doses[di].date.getTime() + 48 * 3600000;
+      const winEnd   = doses[di + 1].date.getTime() - 60000;
+      for (let i = 0; i < times.length; i++) {
+        if (times[i] >= winStart && times[i] <= winEnd && concs[i] < minC) {
+          minC = concs[i];
+        }
+      }
+    }
+  } else {
+    const troughCutMs = firstDoseMs + 48 * 3600000;
+    for (let i = 0; i < times.length; i++) {
+      if (times[i] >= troughCutMs && concs[i] < minC) minC = concs[i];
+    }
+  }
+  if (!isFinite(minC)) minC = 0;
+
+  // Current should reflect the real current time even if today is outside the visible chart window.
+  const currentC = computeConc(now);
+  let nowIdx = -1;
+  if (now >= windowStart && now <= windowEnd) {
+    let bestDelta = Infinity;
+    for (let i = 0; i < times.length; i++) {
+      const d = Math.abs(times[i] - now);
+      if (d < bestDelta) { bestDelta = d; nowIdx = i; }
+    }
+  }
+
+  const ssResult = detectSteadyState();
+  updateStats({ maxC, minC, currentC, ssResult });
+
+  // Dose tick indices
+  const doseTicks = doses.map(d => {
+    let best = 0, bd = Infinity;
+    for (let i = 0; i < times.length; i++) {
+      const diff = Math.abs(times[i] - d.date.getTime());
+      if (diff < bd) { bd = diff; best = i; }
+    }
+    return { idx: best, amount: d.amount };
+  });
+
+  const unit = currentUnit === 'mg' ? 'mg equiv.' : 'ng/mL';
+  renderChart(labels, displayConcs, doseTicks, nowIdx, unit);
+}
+
+// ─── STATS DISPLAY ────────────────────────────────────────────────────────────
+function updateStats(s) {
+  if (!s) {
+    ['statCurrent','statPeak','statTrough','statSS'].forEach(id =>
+      document.getElementById(id).textContent = '—'
+    );
+    document.getElementById('statSS').className = 'stat-val';
+    return;
+  }
+  document.getElementById('statCurrent').textContent = fmtStat(s.currentC);
+  document.getElementById('statPeak').textContent    = fmtStat(s.maxC);
+  document.getElementById('statTrough').textContent  = fmtStat(s.minC);
+
+  const ssEl = document.getElementById('statSS');
+  if (s.ssResult.reached) {
+    ssEl.textContent  = 'Yes ✓';
+    ssEl.className    = 'stat-val green';
+  } else {
+    ssEl.textContent  = 'Not yet';
+    ssEl.className    = 'stat-val';
+  }
+}
+
+// ─── WEIGHT CHART ─────────────────────────────────────────────────────────────
+let wtChartInstance = null;
+
+function renderWeightChart() {
+  const canvas = document.getElementById('wtChart');
+  if (wtChartInstance) { wtChartInstance.destroy(); wtChartInstance = null; }
+
+  if (!chartJsReady) {
+    pendingRender = () => renderWeightChart();
+    return;
+  }
+
+  // Build per-dose data points using timestamps so spacing reflects elapsed time.
+  const points = doses.map(d => ({
+    x: d.date.getTime(),
+    y: parseFloat((d.weightKg * 2.20462).toFixed(1)),
+    kg: parseFloat(d.weightKg.toFixed(1))
+  }));
+  const lbsVals = points.map(p => p.y);
+  const firstTs = points[0].x;
+  const lastTs = points[points.length - 1].x;
+  const singlePointPaddingMs = 3 * 86400000;
+  const xMin = firstTs === lastTs ? firstTs - singlePointPaddingMs : firstTs;
+  const xMax = firstTs === lastTs ? lastTs + singlePointPaddingMs : lastTs;
+
+  // Y-axis bounds: ±10% padding around actual min/max, rounded to nearest 5 lbs
+  const minLbs  = Math.min(...lbsVals);
+  const maxLbs  = Math.max(...lbsVals);
+  const spread  = Math.max(maxLbs - minLbs, 10); // at least 10 lbs spread so flat data isn't squashed
+  const padding = Math.max(spread * 0.25, 10);   // 25% of spread or 10 lbs, whichever is larger
+  const yMin    = Math.floor((minLbs - padding) / 5) * 5;
+  const yMax    = Math.ceil( (maxLbs + padding) / 5) * 5;
+
+  const ctx = canvas.getContext('2d');
+
+  wtChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      datasets: [{
+        label: 'Weight',
+        data: points,
+        borderColor: '#10b981',
+        borderWidth: 2,
+        pointRadius: 5,
+        pointBackgroundColor: '#10b981',
+        pointBorderColor: '#0a0f1a',
+        pointBorderWidth: 1.5,
+        pointHoverRadius: 7,
+        pointHoverBackgroundColor: '#10b981',
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 1.5,
+        fill: true,
+        tension: 0.3,
+        backgroundColor: function(ctx2) {
+          const { chart } = ctx2;
+          const { ctx: c, chartArea } = chart;
+          if (!chartArea) return 'rgba(16,185,129,0.08)';
+          const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          g.addColorStop(0, 'rgba(16,185,129,0.18)');
+          g.addColorStop(1, 'rgba(16,185,129,0.01)');
+          return g;
+        }
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2.1,
+      animation: { duration: 350, easing: 'easeInOutCubic' },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111827',
+          borderColor: '#1f2d42',
+          borderWidth: 1,
+          titleColor: '#64748b',
+          bodyColor: '#e2e8f0',
+          titleFont: { family: "'DM Mono', monospace", size: 10 },
+          bodyFont: { family: "'DM Mono', monospace", size: 12 },
+          padding: 10,
+          callbacks: {
+            title: items => fmtDate(new Date(items[0].raw.x)),
+            label: item => `  ${item.raw.y} lbs  (${item.raw.kg} kg)`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          grid: { color: 'rgba(31,45,66,0.7)', drawTicks: false },
+          min: xMin,
+          max: xMax,
+          ticks: {
+            color: '#475569',
+            font: { family: "'DM Mono', monospace", size: 9 },
+            maxTicksLimit: 10,
+            maxRotation: 0,
+            callback: v => fmtDate(new Date(v))
+          },
+          border: { color: '#1f2d42' }
+        },
+        y: {
+          grid: { color: 'rgba(31,45,66,0.7)', drawTicks: false },
+          min: yMin,
+          max: yMax,
+          ticks: {
+            color: '#475569',
+            font: { family: "'DM Mono', monospace", size: 9 },
+            callback: v => v + ' lbs'
+          },
+          title: {
+            display: true,
+            text: 'lbs',
+            color: '#475569',
+            font: { family: "'DM Mono', monospace", size: 9 }
+          },
+          border: { color: '#1f2d42' }
+        }
+      }
+    }
+  });
+}
+
+// ─── CHART RENDER ─────────────────────────────────────────────────────────────
+function renderChart(labels, data, doseTicks, todayIdx, unit) {
+  const canvas = document.getElementById('pkChart');
+
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+  if (!chartJsReady) {
+    pendingRender = () => renderChart(labels, data, doseTicks, todayIdx, unit);
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Plasma Concentration',
+        data,
+        borderColor: '#3b82f6',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: '#3b82f6',
+        pointHoverBorderColor: '#ffffff',
+        pointHoverBorderWidth: 1.5,
+        fill: true,
+        tension: 0.3,
+        backgroundColor: function(ctx2) {
+          const { chart } = ctx2;
+          const { ctx: c, chartArea } = chart;
+          if (!chartArea) return 'rgba(59,130,246,0.1)';
+          const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          g.addColorStop(0, 'rgba(59,130,246,0.28)');
+          g.addColorStop(1, 'rgba(59,130,246,0.02)');
+          return g;
+        }
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2.1,
+      animation: { duration: 350, easing: 'easeInOutCubic' },
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#111827',
+          borderColor: '#1f2d42',
+          borderWidth: 1,
+          titleColor: '#64748b',
+          bodyColor: '#e2e8f0',
+          titleFont: { family: "'DM Mono', monospace", size: 10 },
+          bodyFont: { family: "'DM Mono', monospace", size: 12 },
+          padding: 10,
+          callbacks: {
+            title: items => items[0].label,
+            label: item => {
+              const decimals = currentUnit === 'mg' ? 4 : 2;
+              return '  ' + item.parsed.y.toFixed(decimals) + ' ' + unit;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(31,45,66,0.7)', drawTicks: false },
+          ticks: {
+            color: '#475569',
+            font: { family: "'DM Mono', monospace", size: 9 },
+            maxTicksLimit: 10,
+            maxRotation: 0
+          },
+          border: { color: '#1f2d42' }
+        },
+        y: {
+          grid: { color: 'rgba(31,45,66,0.7)', drawTicks: false },
+          ticks: {
+            color: '#475569',
+            font: { family: "'DM Mono', monospace", size: 9 },
+            callback: v => {
+            if (currentUnit === 'mg') return v.toFixed(4);
+            return v >= 1 ? v.toFixed(1) : v.toFixed(2);
+          }
+          },
+          title: {
+            display: true,
+            text: unit,
+            color: '#475569',
+            font: { family: "'DM Mono', monospace", size: 9 }
+          },
+          border: { color: '#1f2d42' },
+          min: 0
+        }
+      }
+    },
+    plugins: [{
+      id: 'overlays',
+      afterDraw(chart) {
+        const { ctx: c, scales: { x }, chartArea } = chart;
+        if (!chartArea) return;
+        const n = chart.data.labels.length;
+
+        // Dose vertical lines — using stored index, not string lookup
+        doseTicks.forEach(tick => {
+          if (tick.idx < 0 || tick.idx >= n) return;
+          const xPos = x.getPixelForValue(tick.idx);
+          c.save();
+          c.beginPath();
+          c.moveTo(xPos, chartArea.top);
+          c.lineTo(xPos, chartArea.bottom);
+          c.strokeStyle = 'rgba(59,130,246,0.2)';
+          c.lineWidth = 1;
+          c.setLineDash([3, 4]);
+          c.stroke();
+          c.fillStyle = 'rgba(96,165,250,0.7)';
+          c.font = "8px 'DM Mono', monospace";
+          c.textAlign = 'center';
+          c.fillText(tick.amount + 'mg', xPos, chartArea.top + 9);
+          c.restore();
+        });
+
+        // Today line
+        if (todayIdx >= 0 && todayIdx < n) {
+          const xPos = x.getPixelForValue(todayIdx);
+          c.save();
+          c.beginPath();
+          c.moveTo(xPos, chartArea.top);
+          c.lineTo(xPos, chartArea.bottom);
+          c.strokeStyle = 'rgba(16,185,129,0.55)';
+          c.lineWidth = 1.5;
+          c.setLineDash([]);
+          c.stroke();
+          c.fillStyle = 'rgba(16,185,129,0.85)';
+          c.font = "bold 8px 'DM Mono', monospace";
+          c.textAlign = 'center';
+          c.fillText('TODAY', xPos, chartArea.bottom + 11);
+          c.restore();
+        }
+      }
+    }]
+  });
+}
+
+// ─── UNIT TESTS ──────────────────────────────────────────────────────────────
+// Kept in this HTML file by design. Run from the console with:
+//   runUnitTests()
+// Or open index.html?test=1 to run them automatically.
+function runUnitTests() {
+  const tests = [];
+
+  function test(name, fn) {
+    tests.push({ name, fn });
+  }
+
+  function assert(condition, message) {
+    if (!condition) throw new Error(message || 'Assertion failed');
+  }
+
+  function assertNear(actual, expected, tolerance, message) {
+    const delta = Math.abs(actual - expected);
+    assert(delta <= tolerance, `${message}: expected ${expected}, got ${actual}`);
+  }
+
+  test('formatDateInputValue returns yyyy-mm-dd', () => {
+    assert(formatDateInputValue(new Date('2026-04-05T12:00:00')) === '2026-04-05');
+  });
+
+  test('calcWeightScalar matches expected reference behavior', () => {
+    assertNear(calcWeightScalar(90), 1, 0.000001, '90 kg should be the reference');
+    assert(calcWeightScalar(70) > 1, 'lower weight should increase exposure');
+    assert(calcWeightScalar(120) < 1, 'higher weight should decrease exposure');
+  });
+
+  test('doseContrib is zero before dosing and positive after dosing', () => {
+    assert(doseContrib(0.25, 90, 0) === 0, 'dose time should be zero');
+    assert(doseContrib(0.25, 90, -1) === 0, 'pre-dose time should be zero');
+    assert(doseContrib(0.25, 90, 48) > 0, 'post-dose concentration should be positive');
+  });
+
+  test('single 0.25mg dose peaks near the expected model Cmax', () => {
+    const peak = doseContrib(0.25, 90, 48);
+    assertNear(peak, 15, 3, '48h concentration should be near 15 ng/mL');
+  });
+
+  test('parseDosePayload validates, parses, and sorts records', () => {
+    const parsed = parseDosePayload([
+      { dateISO: '2026-04-08T12:00:00.000Z', amount: '0.5', weightKg: '88' },
+      { dateISO: '2026-04-01T12:00:00.000Z', amount: 0.25, weightKg: 90 }
+    ]);
+
+    assert(parsed.length === 2, 'two records should parse');
+    assert(parsed[0].amount === 0.25, 'records should sort oldest first');
+    assert(parsed[1].date instanceof Date, 'dateISO should become a Date');
+  });
+
+  test('parseDosePayload rejects invalid records', () => {
+    let failed = false;
+    try {
+      parseDosePayload([{ dateISO: 'bad-date', amount: 0.25, weightKg: 90 }]);
+    } catch(e) {
+      failed = true;
+    }
+    assert(failed, 'invalid date should throw');
+  });
+
+  test('doseToJSON round-trips through parseDosePayload', () => {
+    const dose = { date: new Date('2026-04-01T12:00:00.000Z'), amount: 0.25, weightKg: 90 };
+    const parsed = parseDosePayload([doseToJSON(dose)])[0];
+    assert(parsed.date.toISOString() === dose.date.toISOString(), 'date should round-trip');
+    assert(parsed.amount === dose.amount, 'amount should round-trip');
+    assert(parsed.weightKg === dose.weightKg, 'weight should round-trip');
+  });
+
+  test('buildExampleDoses creates the expected titration schedule', () => {
+    const example = buildExampleDoses(new Date('2026-01-01T12:00:00'));
+    assert(example.length === 9, 'example should have 9 doses');
+    assert(example[0].amount === 0.25, 'first four doses should be 0.25mg');
+    assert(example[3].amount === 0.25, 'fourth dose should be 0.25mg');
+    assert(example[4].amount === 0.5, 'fifth dose should step up to 0.5mg');
+    assert(example[8].weightKg < example[0].weightKg, 'example weight should trend down');
+  });
+
+  test('computeConcForDoses sums multiple injections', () => {
+    const doseList = [
+      { date: new Date('2026-01-01T12:00:00Z'), amount: 0.25, weightKg: 90 },
+      { date: new Date('2026-01-08T12:00:00Z'), amount: 0.25, weightKg: 90 }
+    ];
+    const afterSecond = new Date('2026-01-10T12:00:00Z').getTime();
+    assert(computeConcForDoses(afterSecond, doseList) > doseContrib(0.25, 90, 48));
+  });
+
+  test('detectSteadyStateForDoses reports false for too few doses', () => {
+    const doseList = [
+      { date: new Date('2026-01-01T12:00:00Z'), amount: 0.25, weightKg: 90 },
+      { date: new Date('2026-01-08T12:00:00Z'), amount: 0.25, weightKg: 90 }
+    ];
+    assert(detectSteadyStateForDoses(doseList).reached === false);
+  });
+
+  const results = tests.map(({ name, fn }) => {
+    try {
+      fn();
+      return { name, status: 'pass' };
+    } catch(error) {
+      return { name, status: 'fail', message: error.message };
+    }
+  });
+
+  const failed = results.filter(r => r.status === 'fail');
+  console.table(results);
+
+  if (failed.length > 0) {
+    throw new Error(`${failed.length} unit test(s) failed`);
+  }
+
+  console.info(`All ${results.length} unit tests passed.`);
+  return results;
+}
+
+window.runUnitTests = runUnitTests;
+
+if (new URLSearchParams(location.search).get('test') === '1') {
+  window.addEventListener('load', () => runUnitTests());
+}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<script>
+const MODAL_FILES = {
+  readme: './README.md',
+  license: './LICENSE'
+};
+
+const modalCache = {};
+
+function openModal(type) {
+  const overlay = document.getElementById('modalOverlay');
+  const title = document.getElementById('modalTitle');
+  const body = document.getElementById('modalBody');
+
+  title.textContent = type === 'readme' ? 'README.md' : 'LICENSE';
+  body.innerHTML = '<div class="modal-error">Loading…</div>';
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  if (modalCache[type]) {
+    renderModal(type, modalCache[type]);
+    return;
+  }
+
+  fetch(MODAL_FILES[type])
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.text();
+    })
+    .then(text => {
+      modalCache[type] = text;
+      renderModal(type, text);
+    })
+    .catch(err => {
+      body.innerHTML = `<div class="modal-error">
+        Could not load ${MODAL_FILES[type]}.<br><br>
+        Make sure the file is deployed alongside index.html.<br>
+        <small style="opacity:0.6;">${escapeHtml(err.message)}</small>
+      </div>`;
+    });
+}
+
+function renderModal(type, text) {
+  const body = document.getElementById('modalBody');
+  if (type === 'readme') {
+    if (typeof marked !== 'undefined') {
+      marked.setOptions({ breaks: true, gfm: true });
+      body.innerHTML = marked.parse(text);
+    } else {
+      body.innerHTML = `<pre class="modal-plain">${escapeHtml(text)}</pre>`;
+    }
+  } else {
+    body.innerHTML = `<pre class="modal-plain">${escapeHtml(text)}</pre>`;
+  }
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+
+function escapeHtml(str) {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+</script>
+</body>
+</html>
